@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<title>testgui2 (Three.js)</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link rel=stylesheet href="css/base.css"/>
+</head>
+<body>
+	
+	<audio id= "BGM" src="sounds/Kalimba.mp3" >
+	</audio>
+	<audio id="Hit" src="sounds/hitball.wav">
+	</audio>
+<script src="js/three.min.js"></script>
+<script src="js/OrbitControls.js"></script>
+<script src="js/THREEx.KeyboardState.js"></script>
+<script type='text/javascript' src='js/DAT.GUI.min.js'></script>
+
+<div id="ThreeJS" style="z-index: 0; position: absolute; left:0px; top:0px"></div>
+<script>
+
+var scene,renderer,camera,container,controls;
+var dir = new THREE.Vector3(-1,0,2);
+var arm,arm2;
+var ball;
+var theta1=0,theta2=0;
+var floor, plane, cyl;
+var mouse = new THREE.Vector2();
+init();
+animate();
+			
+function init() 
+{
+	window.addEventListener( 'mousemove', onDocumentMouseMove, false );
+	window.addEventListener( 'resize', onWindowResize, false );
+		
+	scene = new THREE.Scene();
+	var screenW = window.innerWidth;
+	var screenH = window.innerHeight;
+	camera = new THREE.PerspectiveCamera(45,screenW/screenH,0.1,10000);
+	camera.position.set(0,150,400);
+	scene.add(camera);
+	camera.lookAt(0,0,0);
+	
+	//var audio = document.getElementsByTagName('audio')[0];
+	// 播放
+	//audio.play();
+	// 暫停
+	//	audio.pause();
+
+	
+	renderer = new THREE.WebGLRenderer({antialias:true});
+	renderer.setClearColor(0x888888);
+	renderer.setSize(screenW,screenH);
+	//audio
+	var audio = document.getElementById( 'BGM' );
+	audio.pause();
+	
+	//audio.loop();	
+	container = document.getElementById( 'ThreeJS' );
+	container.appendChild( renderer.domElement );
+	
+	controls = new THREE.OrbitControls(camera,renderer.domElement);
+	
+	//var listener = new THREE.AudioListener();
+	//scene.add( listener );
+	
+	//FLOOR
+	floor = new THREE.GridHelper(100,10);
+	floor.setColors( new THREE.Color(0xff0000), new THREE.Color(0x000000) );
+	floor.position.y = -5;
+	scene.add(floor);
+	
+	//LIGHT
+	var light = new THREE.PointLight(0xffffff);
+	light.position.set(0,200,100);
+	scene.add(light);
+	
+	//BALL
+	ball = new THREE.Mesh(new THREE.CylinderGeometry (10,10,4,32),new THREE.MeshLambertMaterial ({color: 0xff2211}));
+	ball.position.y = -3;
+	scene.add(ball);
+	
+		
+	var box = new THREE.BoxGeometry(20,10,10);
+	var boxmaterial = new THREE.MeshLambertMaterial({color:0x66ff9c});
+	arm = new THREE.Mesh(box,boxmaterial);
+	scene.add(arm);
+	arm2 = new THREE.Mesh(new THREE.BoxGeometry(40,10,10),new THREE.MeshLambertMaterial({color:0xffffff}));
+	arm.add(arm2);
+	
+	plane = new THREE.Mesh(
+		new THREE.PlaneBufferGeometry( 200, 200, 8, 8 ),
+		new THREE.MeshBasicMaterial( { color: 0xffffff, opacity: 1, transparent: false } )
+	);
+	plane.rotation.x = -Math.PI/2;
+	plane.visible = false;   // invisible, for picking only
+	scene.add( plane );
+	var cyl_geom = new THREE.CylinderGeometry (10,10,4,32);
+	var cyl_mat = new THREE.MeshLambertMaterial ({color: 0xff2211});
+	cyl = new THREE.Mesh (cyl_geom, cyl_mat);
+	cyl.position.set (-20,0,20);
+	scene.add (cyl);
+	
+	//GUI
+	var gui = new dat.GUI();
+	parameters ={
+		theta1:0,
+		theta2:0,
+		reset: function(){ resetball()}
+	};
+	var Theta1 = gui.add(parameters,'theta1',0,3.14);
+	var Theta2 = gui.add(parameters,'theta2',-1.5,1.5);
+	gui.add(parameters,'reset').name('Reset');
+	
+	Theta1.onChange(function(value) 
+	{   theta1 = value;   });
+	Theta2.onChange(function(value) 
+	{   theta2 = value;   });
+	
+	//CameraHelper(camera);
+	
+}
+function resetball()
+{
+	ball.position.set(0,0,0);
+	dir = new THREE.Vector3(0,0,0);
+}
+function onDocumentMouseMove( event ) {
+	event.preventDefault();
+	mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+	mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+	
+	var vector = new THREE.Vector3( mouse.x, mouse.y, 0.5 ).unproject( camera );
+	var raycaster = new THREE.Raycaster( camera.position, vector.sub( camera.position ).normalize() );
+
+	var intersects = raycaster.intersectObject( plane );
+	if (intersects.length > 0) {
+		var move = intersects[0].point.clone();//.sub (offset);
+		cyl.position.copy (move);
+	}
+}
+function onWindowResize(){
+
+	camera.aspect = window.innerWidth/window.innerHeight;
+	camera.updateProjectionMatrix();
+	renderer.setSize(window.innerWidth,window.innerHeight);
+
+}
+function animate() 
+{
+	ball.position.add(dir);
+	dir.multiplyScalar (0.99);
+	arm.rotation.y = theta1;
+	arm2.rotation.y = theta2;
+	arm.position.set (10*Math.cos(theta1),0,100-10*Math.sin(theta1));
+	arm2.position.set (10+20*Math.cos(theta2),0,-20*Math.sin(theta2));
+    requestAnimationFrame( animate );
+	render();		
+	update();
+}
+
+function update()
+{
+	if(ball.position.z > 90)
+		dir.z = dir.z*(-1);
+	if(ball.position.z < -90)
+		dir.z = dir.z*(-1);	
+	if(ball.position.x < -90)
+		dir.x = dir.x*(-1);
+	if(ball.position.x > 90)
+		dir.x = dir.x*(-1);
+	if( Math.pow(ball.position.x-cyl.position.x,2)+Math.pow(ball.position.z-cyl.position.z,2) <400){ 
+		Hit.play();
+		dir = new THREE.Vector3(ball.position.x-cyl.position.x,0,ball.position.z-cyl.position.z).multiplyScalar(0.3);
+		}
+	controls.update();
+	
+}
+
+function render() 
+{	
+	
+	renderer.render( scene, camera );
+}
+
+</script>
+
+</body>
+</html>
